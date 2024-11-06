@@ -61,18 +61,37 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
 
         return step_function_matrix
 
+    def graphon_mixup(self, graphon1: np.ndarray, graphon2: np.ndarray, interpolation_lambda: float) -> np.ndarray:
+        """
+        Takes two graphons (or approximations) and an interpolation hyperparameter lambda and interpolates them to create a mixed 
+        graphon approximate that can be utilized to generate new graphs with new labels
 
-    def graphon_mixup():
+        graphon1: numpy.ndarray
+            The first graphon to be mixed
+        graphon2: numpy.ndarray
+            The second graphon to be mixed
+        interpolation_lambda: float
+            The interpolation hyperparameter lambda (between 0 and 1) that determines the weight of the first graphon in the mix
         """
-        Takes two graphons and an interpolation hyperparameter lambda and interpolates them to create a mixed graphon that can be utilized to generate new graphs with new labels
-        """
-        pass
 
-    def label_mixup():
+        assert 0 <= interpolation_lambda <= 1, "lambda should be in the range [0, 1]"
+        return interpolation_lambda * graphon1 + (1 - interpolation_lambda) * graphon2
+        
+
+    def label_mixup(self, label1: int, label2: int, interpolation_lambda: float) -> int:
         """
-        Takes two labels and an interpolation hyperparameter lambda and interpolates them to produce a new label.
+        Takes two labels and an interpolation hyperparameter lambda and interpolates them to create a mixed label
+
+        label1: int
+            The first label to be mixed
+        label2: int
+            The second label to be mixed
+        interpolation_lambda: float
+            The interpolation hyperparameter lambda (between 0 and 1) that determines the weight of the first label in the mix
         """
-        pass
+
+        assert 0 <= interpolation_lambda <= 1, "lambda should be in the range [0, 1]"
+        return int(interpolation_lambda * label1 + (1 - interpolation_lambda) * label2)
 
     def generate(aug_ratio, num_samples):
         """
