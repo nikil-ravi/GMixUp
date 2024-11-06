@@ -28,6 +28,9 @@ class GIN(torch.nn.Module):
     
 # GCN
 class GCN(nn.Module):
+
+    # TODO Jared
+
     def __init__(self):
         pass
 

@@ -7,8 +7,8 @@ from model import GIN
 def main():
 
     # get data
-    graphs, labels = load_data() # TODO: implement load_data function
-    train_graphs, train_labels, test_graphs, test_labels = split_data(graphs, labels) # TODO: split_data function
+    graphs, labels = load_data() # TODO: implement load_data function (Jared)
+    train_graphs, train_labels, test_graphs, test_labels = split_data(graphs, labels) # TODO: Jared
 
     # initialize GMixUp object
     gmixup = GMixUp(train_graphs, train_labels)

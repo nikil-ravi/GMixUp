@@ -7,12 +7,14 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         """
         Sets the training data and labels to generate synthetic data for
         """
+        # TODO Andy
         pass
 
     def __call__(self) -> Data:
         """
         Override of GraphGenerator's __call__ method for sampling graphs
         """
+        # TODO Andy
         pass
 
     def align_nodes(self, graph, criterion="degree"):
@@ -45,7 +47,7 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         # partition nodes into K intervals; each interval will have N/K nodes
         N = aligned_adjacency_matrices[0].shape[0] # assumes all graphs have the same number of nodes
         partition_size = N // K
-        
+
         partitions = [list(range(i, min(i + partition_size, N))) for i in range(0, N, partition_size)]
 
 
@@ -98,4 +100,5 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         Uses the (typically mixed) graphon and samples from it to generate 
         synthetic graphs that can serve as augmentated data.
         """
+        # TODO Andy
         pass
