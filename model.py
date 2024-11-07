@@ -26,13 +26,25 @@ class GIN(torch.nn.Module):
         x = global_mean_pool(x, batch)
         return F.log_softmax(x, dim=1)
     
-# GCN
+
+
+# GIN
 class GCN(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dim=64):
+        super(GIN, self).__init__()
 
-    # TODO Jared
+        # using the built-in GCN model from PyTorch Geometric, with parameters 
+        # from page 15 appendix F https://arxiv.org/pdf/2202.07179 
+        self.gin = GIN(
+            in_channels=input_dim,
+            hidden_channels=hidden_dim,
+            num_layers=4,
+            out_channels=output_dim,
+            act='relu',
+        )
 
-    def __init__(self):
-        pass
-
-    def forward(self, x, edge_index):
-        pass
+    def forward(self, x, edge_index, batch):
+        x = self.gin(x, edge_index)
+        x = global_mean_pool(x, batch)
+        return F.log_softmax(x, dim=1)
+    

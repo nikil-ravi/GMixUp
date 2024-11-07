@@ -1,37 +1,65 @@
+
+import argparse
+from pathlib import Path
 import torch
-from gmixup import GMixUp
-from data import load_data, split_data
+from torch_geometric.loader import DataLoader
 
-from model import GIN
+from gmixup import GMixup
+from data import load_data
+from model import GIN, GCN
 
-def main():
+
+def main(args):
 
     # get data
-    graphs, labels = load_data() # TODO: implement load_data function (Jared)
-    train_graphs, train_labels, test_graphs, test_labels = split_data(graphs, labels) # TODO: Jared
+    train, test = load_data(
+        args.dataset,
+        args.data_cache_path,
+        args.train_split_ratio
+    )
 
     # initialize GMixUp object
-    gmixup = GMixUp(train_graphs, train_labels)
+    gmixup = GMixup(train)
 
     # generate synthetic data
-    synthetic_graphs = gmixup.generate(aug_ratio=0.5, num_samples=5)
+    synthetic = gmixup.generate(aug_ratio=0.5, num_samples=5)
 
-    combined_dataset = train_graphs + synthetic_graphs
-    # combined_labels = train_labels + synthetic_labels
+    # mix real and synthetic data
+    combined_train_data = DataLoader(
+        [train, synthetic],
+        batch_size=args.batch_size,
+        shuffle=True
+    )
 
     # train model
-    model = GIN(input_dim=None, output_dim=None) # TODO: fill in input_dim and output_dim
+    if args.model == 'GIN':
+        model = GIN
+    elif args.model == 'GCN':
+        model = GCN
+    model = model(input_dim=train.num_features, output_dim=train.num_classes)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     num_epochs = 10
 
     for epoch in range(num_epochs):
-        # ...
-        # TODO: implement training loop
-        # ...
-        break
+        
+        for batch in combined_train_data:
+            # batch is type torch_geometric.data.Batch
+            pass
+
 
     # evaluate model
     # ...
 
+
 if __name__ == '__main__':
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', default='GIN', choices=['GIN', 'GCN'])
+    parser.add_argument('--dataset', default='REDDIT-BINARY',
+        choices=['REDDIT-BINARY', 'REDDIT-MULTI-5K', 'IMDB-BINARY', 'IMDB-MULTI'])
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--train-split-ratio', type=float, default=0.80)
+    parser.add_argument('--data-cache-path', type=Path, default=Path('./'))
+    args = parser.parse_args()
+
+    main(args)
