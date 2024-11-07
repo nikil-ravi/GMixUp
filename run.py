@@ -54,7 +54,7 @@ def main(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='GIN', choices=['GIN', 'GCN'])
+    parser.add_argument('--model', default='GIN', choices=['GIN', 'GCN'])
     parser.add_argument('--dataset', default='REDDIT-BINARY',
         choices=['REDDIT-BINARY', 'REDDIT-MULTI-5K', 'IMDB-BINARY', 'IMDB-MULTI'])
     parser.add_argument('--batch-size', type=int, default=32)
