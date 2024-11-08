@@ -23,7 +23,7 @@ def main(args):
     gmixup = GMixup(train)
 
     # generate synthetic data
-    synthetic = gmixup.generate(aug_ratio=0.5, num_samples=5)
+    synthetic = gmixup.generate(aug_ratio=0.5, num_samples=5, interpolation_lambda=args.interpolation_lambda)
 
     # mix real and synthetic data
     combined_train_data = DataLoader(
@@ -86,6 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('--data-cache-path', type=Path, default=Path('./'))
     parser.add_argument('--aug-ratio', type=float, default=0.5)
     parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--interpolation-lambda', type=float, default=0.1)
     args = parser.parse_args()
 
     main(args)
