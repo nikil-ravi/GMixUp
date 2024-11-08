@@ -3,6 +3,25 @@ import torch_geometric
 from torch_geometric.data import Data
 import numpy as np
 
+def mixup_cross_entropy_loss(input, target, size_average=True):
+    """
+    Custom cross-entropy loss for Mixup with soft labels.
+    
+    Arguments:
+    input -- Predicted probabilities from the model (after softmax or log softmax).
+    target -- Soft labels as the ground truth, resulting from Mixup interpolation.
+    size_average -- Whether to return the average loss per sample.
+
+    Returns:
+    the mixup cross-entropy loss, averaging over all samples if size_average is True.
+    """
+    assert input.size() == target.size()    
+    loss = -torch.sum(input * target)
+    
+    # Returns the average loss if specified, otherwise returns total loss
+    return loss / input.size()[0] if size_average else loss
+
+
 class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
     def __init__(self, train_x, train_y):
         """
