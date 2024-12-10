@@ -214,6 +214,28 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         """
         assert 0 <= interpolation_lambda <= 1, "lambda should be in the range [0, 1]"
         return interpolation_lambda * graphon1 + (1 - interpolation_lambda) * graphon2
+    
+    def label_mixup(self, label1: torch.Tensor, label2: torch.Tensor, interpolation_lambda: float) -> torch.Tensor:
+        """
+        Interpolates two labels using a given interpolation factor.
+
+        Parameters:
+        label1 -- The label of the first graph (PyTorch tensor or scalar).
+        label2 -- The label of the second graph (PyTorch tensor or scalar).
+        interpolation_lambda -- The interpolation factor (float between 0 and 1).
+
+        Returns:
+        mixed_label -- The interpolated label (PyTorch tensor).
+        """
+        assert 0 <= interpolation_lambda <= 1, "lambda should be in the range [0, 1]"
+        # Ensure labels are tensors
+        label1 = label1 if isinstance(label1, torch.Tensor) else torch.tensor(label1, dtype=torch.float)
+        label2 = label2 if isinstance(label2, torch.Tensor) else torch.tensor(label2, dtype=torch.float)
+
+        # Perform interpolation
+        mixed_label = interpolation_lambda * label1 + (1 - interpolation_lambda) * label2
+        return mixed_label
+
 
 
 
