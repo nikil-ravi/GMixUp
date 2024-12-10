@@ -35,6 +35,20 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         self.train_data = train_data
         self.train_data_x = [graph.x for graph in train_data]
         self.train_data_y = [graph.y for graph in train_data]
+    
+    def __call__(self, aug_ratio=0.5, num_samples=5, interpolation_lambda=0.1):
+        """
+        Generates synthetic graphs using the specified parameters.
+        
+        Parameters:
+        aug_ratio -- Proportion of augmented data relative to the original dataset.
+        num_samples -- Number of synthetic graphs to generate per pair of classes.
+        interpolation_lambda -- Interpolation factor between graphons and labels.
+
+        Returns:
+        synthetic_graphs -- List of synthetic graphs with features and labels.
+        """
+        return self.generate(aug_ratio, num_samples, interpolation_lambda)
 
 
     def align_nodes(self, graph, original_features, criterion="degree"):
