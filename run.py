@@ -120,7 +120,8 @@ def evaluate(model: nn.Module, test: DataLoader, device):
         batch = batch.to(device)
         out = model.predict(batch.x, batch.edge_index, batch.batch)
 
-        total_correct += (out == batch.y).sum()
+        labels = torch.argmax(batch.y, dim=1)  # Convert one-hot to class indices
+        total_correct += (out == labels).sum()
         total_samples += len(batch)
     
     acc = total_correct / total_samples
