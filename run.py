@@ -12,6 +12,9 @@ from gmixup import GMixup, mixup_cross_entropy_loss
 from data import *
 from model import GIN, GCN
 
+def to_one_hot(labels, num_classes):
+    return F.one_hot(labels, num_classes=num_classes).float()
+
 
 def main(args):
 
@@ -19,16 +22,37 @@ def main(args):
     dataset = load_data(args.dataset, args.data_cache_path)
     dataset = create_node_features(dataset)
     train, test = split_data(dataset, *args.data_split)
+    num_features = dataset.num_features
+    num_classes = dataset.num_classes
 
 
     if args.use_mixup:
+        # Modify training data labels to one-hot
+        # Convert 'train' dataset to a list of Data objects.
+        train_list = [data for data in train]
+        for data in train_list:
+            data.y = F.one_hot(data.y.long(), num_classes=num_classes).float()
+        train = train_list  # Now 'train' is a list of Data objects with updated labels.
+
+        # Similarly for test:
+        test_list = [data for data in test]
+        for data in test_list:
+            data.y = F.one_hot(data.y.long(), num_classes=num_classes).float()
+        test = test_list
+
         gmixup = GMixup(train)
         synthetic = gmixup.generate(
             aug_ratio=0.5,
             num_samples=5,
-            interpolation_lambda=args.interpolation_lambda
+            interpolation_lambda=args.interpolation_lambda,
+            num_classes=num_classes
         )
+
         combined_graphs = train + synthetic
+
+        for i, g in enumerate(combined_graphs):
+            # assert shape of y is (1, num_classes)
+            assert g.y.shape == (1, num_classes)
 
         dataloader = DataLoader(
             combined_graphs,
@@ -53,7 +77,7 @@ def main(args):
         model = GCN
     else:
         raise ValueError(f'Unknown model: {model}')
-    model = model(input_dim=train.num_features, output_dim=train.num_classes)
+    model = model(input_dim=num_features, output_dim=num_classes)
 
     # set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -70,7 +94,7 @@ def main(args):
         for batch in dataloader:
             batch = batch.to(device)
             out = model.forward(batch.x, batch.edge_index, batch.batch)
-
+            
             # Compute loss (assumes labels are in batch.y)
             loss = loss_fn(out, batch.y)
             total_loss += len(batch) * loss.item()
