@@ -272,6 +272,8 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         Returns:
         Padded feature matrix (target_size x num_features).
         """
+        if not isinstance(features, torch.Tensor):
+            features = torch.tensor(features, dtype=torch.float)
         num_nodes, num_features = features.shape
         if num_nodes >= target_size:
             return features
