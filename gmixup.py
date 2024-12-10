@@ -215,13 +215,13 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
 
     def generate(self, aug_ratio, num_samples, interpolation_lambda):
         """
-        Generates synthetic graphs with node features for data augmentation.
-        
+        Generates synthetic graphs with aligned node features for data augmentation.
+
         Parameters:
         aug_ratio -- Proportion of augmented data relative to the original dataset.
         num_samples -- Number of synthetic graphs to generate per pair of classes.
         interpolation_lambda -- Interpolation factor between graphons and labels.
-        
+
         Returns:
         synthetic_graphs -- List of synthetic `Data` objects with features.
         """
@@ -238,10 +238,15 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
             graphon1, features1 = self.estimate_graphon([graph1], [graph1.x], K=10)
             graphon2, features2 = self.estimate_graphon([graph2], [graph2.x], K=10)
 
+            # Align node features by padding
+            max_nodes = max(features1.shape[0], features2.shape[0])
+            features1_padded = self.pad_features(features1, max_nodes)
+            features2_padded = self.pad_features(features2, max_nodes)
+
             for _ in range(num_samples):
                 # Mix graphons and labels
                 mixed_graphon = self.graphon_mixup(graphon1, graphon2, interpolation_lambda)
-                mixed_features = interpolation_lambda * features1 + (1 - interpolation_lambda) * features2
+                mixed_features = interpolation_lambda * features1_padded + (1 - interpolation_lambda) * features2_padded
                 mixed_label = self.label_mixup(graph1.y.item(), graph2.y.item(), interpolation_lambda)
 
                 # Generate synthetic graph
@@ -255,6 +260,27 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
                     break
 
         return synthetic_graphs
+    
+    def pad_features(self, features, target_size):
+        """
+        Pads a feature matrix to match the target size.
+
+        Parameters:
+        features -- Node feature matrix (num_nodes x num_features).
+        target_size -- Target number of nodes.
+
+        Returns:
+        Padded feature matrix (target_size x num_features).
+        """
+        num_nodes, num_features = features.shape
+        if num_nodes >= target_size:
+            return features
+
+        # Create a zero-padded matrix
+        padded_features = torch.zeros((target_size, num_features), dtype=features.dtype)
+        padded_features[:num_nodes, :] = features
+        return padded_features
+
 
     
     def generate_from_graphon(self, graphon, graphon_features):
