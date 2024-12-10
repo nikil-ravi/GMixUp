@@ -91,6 +91,7 @@ def main(args):
         for batch in dataloader:
             batch = batch.to(device)
             out = model.forward(batch.x, batch.edge_index, batch.batch)
+            out = F.log_softmax(out, dim=1)
             
             # Compute loss (assumes labels are in batch.y)
             loss = loss_fn(out, batch.y)
