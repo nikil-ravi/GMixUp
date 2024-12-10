@@ -12,9 +12,6 @@ from gmixup import GMixup, mixup_cross_entropy_loss
 from data import *
 from model import GIN, GCN
 
-def to_one_hot(labels, num_classes):
-    return F.one_hot(labels, num_classes=num_classes).float()
-
 
 def main(args):
     torch.manual_seed(args.seed)
@@ -46,7 +43,6 @@ def main(args):
             aug_ratio=0.5,
             num_samples=5,
             interpolation_lambda=args.interpolation_lambda,
-            num_classes=num_classes
         )
 
         combined_graphs = train + synthetic

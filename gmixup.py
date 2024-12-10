@@ -2,7 +2,7 @@ import torch
 import torch_geometric
 from torch_geometric.data import Data
 import numpy as np
-# from skimage.restoration import denoise_tv_chambolle
+from skimage.restoration import denoise_tv_chambolle
 import torch.nn.functional as F
 
 
@@ -18,10 +18,50 @@ def mixup_cross_entropy_loss(input, target, size_average=True):
     Returns:
     the mixup cross-entropy loss, averaging over all samples if size_average is True.
     """
-    print(input.size(), target.size())
     assert input.size() == target.size()    
     loss = -torch.sum(input * target)
     return loss / input.size(0) if size_average else loss
+
+def universal_svd(adj_matrix: torch.Tensor, threshold: float = 2.02) -> np.ndarray:
+    """
+    Estimate a graphon by universal singular value thresholding.
+    """
+    num_nodes = adj_matrix.size(0)
+    u, s, v = torch.svd(adj_matrix)
+    singular_threshold = threshold * (num_nodes ** 0.5)
+    # Zero out singular values below threshold
+    s[s < singular_threshold] = 0
+    graphon = u @ torch.diag(s) @ v.t()
+    # Clip to [0, 1]
+    graphon = torch.clamp(graphon, min=0, max=1)
+    return graphon.numpy()
+def sorted_smooth(self, aligned_graphs: list, h: int) -> np.ndarray:
+    """
+    Implement the sorted_smooth method. This first averages the aligned graphs 
+    and then applies a block-averaging via a convolutional operation.
+    Finally, it applies total variation denoising to produce a smooth graphon estimate.
+    """
+    # Convert aligned graphs to a tensor
+    aligned_graphs_t = self.graph_numpy2tensor(aligned_graphs)  # shape (B, N, N)
+    num_graphs = aligned_graphs_t.size(0)
+    if num_graphs > 1:
+        # mean over all graphs, shape: (1,1,N,N) after unsqueeze
+        sum_graph = torch.mean(aligned_graphs_t, dim=0, keepdim=True).unsqueeze(0)
+    else:
+        sum_graph = aligned_graphs_t.unsqueeze(0).unsqueeze(0)  # (1,1,N,N)
+    # create a uniform kernel for block-averaging
+    kernel = torch.ones(1, 1, h, h) / (h ** 2)
+    
+    # apply convolution with stride = h
+    graphon = F.conv2d(sum_graph, kernel, padding=0, stride=h, bias=None)
+    graphon = graphon[0, 0, :, :].numpy()
+    
+    # apply TV denoising (https://www.ipol.im/pub/art/2013/61/article.pdf)
+    graphon = denoise_tv_chambolle(graphon, weight=h)
+    
+    # clip values to [0,1]
+    graphon = np.clip(graphon, 0, 1)
+    return graphon
 
 
 class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
@@ -89,8 +129,13 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
 
     def estimate_graphon(self, graphs, features_list, K, method="partition"):
         """
-        Estimates a graphon and its features from aligned graphs and node features.
+        Takes a set of graphs, returns an approximation of the graphon for that set of graphs.
+        Uses one of two methods:
+        - "partition" Partition nodes into K intervals and estimate edge probability between each pair of intervals
+        - "usvt" SVD-based threhsolding method
+        - "sorted_smooth" Sorted smooth method
         """
+         
         aligned_adjacency_matrices = []
         aligned_features_list_all = []
 
@@ -127,22 +172,23 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
                 graphon_features[i, :] = np.mean(aligned_features_avg[part, :], axis=0)
 
             return graphon_matrix, graphon_features
+        elif method == "usvt":
+            aligned_tensors = self.graph_numpy2tensor(aligned_adjacency_matrices)
+            if aligned_tensors.size(0) > 1:
+                mean_adj = torch.mean(aligned_tensors, dim=0)
+            else:
+                mean_adj = aligned_tensors[0, :, :]
+            
+            # apply SVD-based thresholding
+            graphon = self.universal_svd(mean_adj, threshold=2.02)
+            return graphon
+        elif method == "sorted_smooth":
+            return sorted_smooth(aligned_adjacency_matrices, h=5)
+        else:
+            raise ValueError(f"Unknown graphon estimation method: {method}")
 
-        # elif method == "usvt":
-        #     from graphon_estimator import universal_svd
-        #     aligned_tensors = torch.stack([torch.tensor(matrix) for matrix in aligned_adjacency_matrices])
-        #     mean_adj = torch.mean(aligned_tensors, dim=0)
-        #     graphon = universal_svd(mean_adj)
-        #     return graphon
 
-        # elif method == "sorted_smooth":
-        #     from graphon_estimator import sorted_smooth
-        #     return sorted_smooth(aligned_adjacency_matrices, h=5)
-        # else:
-        #     raise ValueError(f"Unknown graphon estimation method: {method}")
-
-
-    def generate(self, aug_ratio, num_samples, interpolation_lambda, num_classes=None):
+    def generate(self, aug_ratio, num_samples, interpolation_lambda):
         """
         Generates synthetic graphs with aligned node features for data augmentation.
 
