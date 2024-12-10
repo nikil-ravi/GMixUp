@@ -28,8 +28,10 @@ def main(args):
             num_samples=5,
             interpolation_lambda=args.interpolation_lambda
         )
+        combined_graphs = train + synthetic
+
         dataloader = DataLoader(
-            [train, synthetic],
+            combined_graphs,
             batch_size=args.batch_size,
             shuffle=True
         )
