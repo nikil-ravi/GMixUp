@@ -198,6 +198,23 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         padded_features = torch.zeros((target_size, num_features), dtype=features.dtype)
         padded_features[:num_nodes, :] = features
         return padded_features
+    
+    def graphon_mixup(self, graphon1: np.ndarray, graphon2: np.ndarray, interpolation_lambda: float) -> np.ndarray:
+        """
+        Takes two graphons and an interpolation hyperparameter lambda and interpolates them 
+        to create a mixed graphon approximation.
+
+        Parameters:
+        graphon1 -- The first graphon (numpy array).
+        graphon2 -- The second graphon (numpy array).
+        interpolation_lambda -- The interpolation factor between 0 and 1.
+
+        Returns:
+        mixed_graphon -- The interpolated graphon (numpy array).
+        """
+        assert 0 <= interpolation_lambda <= 1, "lambda should be in the range [0, 1]"
+        return interpolation_lambda * graphon1 + (1 - interpolation_lambda) * graphon2
+
 
 
     def generate_from_graphon(self, graphon, graphon_features):
