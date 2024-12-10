@@ -305,10 +305,15 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         # Create edge index
         edge_index = torch.tensor(np.array(adjacency_matrix.nonzero()), dtype=torch.long)
 
+        # Ensure graphon_features is a PyTorch tensor
+        if not isinstance(graphon_features, torch.Tensor):
+            graphon_features = torch.tensor(graphon_features, dtype=torch.float)
+
         # Create graph with node features
         synthetic_graph = Data(edge_index=edge_index)
         synthetic_graph.num_nodes = num_nodes  # Explicitly set num_nodes
-        synthetic_graph.x = torch.tensor(graphon_features, dtype=torch.float)  # Assign graphon features to nodes
+        synthetic_graph.x = graphon_features.clone().detach()  # Clone to avoid in-place modification warnings
 
         return synthetic_graph
+
 
