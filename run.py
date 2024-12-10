@@ -14,6 +14,7 @@ from model import GIN, GCN
 
 
 def main(args):
+    torch.manual_seed(args.seed)
 
     # get data
     dataset = load_data(args.dataset, args.data_cache_path)
@@ -107,7 +108,7 @@ def main(args):
         print(f'Epoch {epoch+1}/{args.epochs}, Loss: {avg_loss:.4f}')
 
 
-    evaluate(model, DataLoader(test, batch_size=args.batch_size), device)
+    return evaluate(model, DataLoader(test, batch_size=args.batch_size), device)
 
 
 
@@ -122,8 +123,9 @@ def evaluate(model: nn.Module, test: DataLoader, device):
         total_correct += (out == batch.y).sum()
         total_samples += len(batch)
     
-    acc = 100 * total_correct / total_samples
-    print(f'Test Accuracy: {acc:.3f}%')
+    acc = total_correct / total_samples
+    print(f'Test Accuracy: {100*acc:.3f}%')
+    return acc.cpu().item()
 
 
 
@@ -149,5 +151,4 @@ if __name__ == '__main__':
     parser.add_argument('--interpolation-lambda', type=float, default=0.1)
     args = parser.parse_args()
 
-    torch.manual_seed(args.seed)
     main(args)
