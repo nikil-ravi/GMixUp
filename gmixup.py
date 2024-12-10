@@ -113,7 +113,7 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
             raise NotImplementedError(f"Criterion {criterion} not implemented")
 
 
-    def estimate_graphon(self, graphs, K):
+    def estimate_graphon(self, graphs, K, method="partition"):
         """
         Takes a set of graphs, returns an approximation of the graphon for that set of graphs.
 
