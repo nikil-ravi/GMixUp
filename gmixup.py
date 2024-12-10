@@ -94,7 +94,9 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         Aligns nodes of a graph based on a criterion (e.g. degree, centrality, etc.)
         """
         if criterion == "degree":
-            node_degrees = graph.degree()
+            edge_index = graph.edge_index
+            num_nodes = graph.num_nodes
+            node_degrees = torch.bincount(edge_index[0], minlength=num_nodes)
             sorted_indices = np.argsort(node_degrees)
             aligned_matrix = graph.adjacency_matrix[sorted_indices, :][:, sorted_indices]
             return aligned_matrix
