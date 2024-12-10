@@ -89,31 +89,43 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         """
         pass
 
-    def align_nodes(self, graph, criterion="degree"):
+    def align_nodes(self, graph, original_features, criterion="degree"):
         """
-        Aligns nodes of a graph based on a criterion (e.g. degree, centrality, etc.)
+        Aligns nodes of a graph based on a criterion (e.g., degree) and aligns node features.
+        
+        Parameters:
+        graph -- PyTorch Geometric Data object.
+        original_features -- Original node features.
+        criterion -- Criterion for node alignment (default is "degree").
+        
+        Returns:
+        Aligned adjacency matrix and aligned node features.
         """
         if criterion == "degree":
-            # Compute the degree of each node from edge_index
             edge_index = graph.edge_index
             num_nodes = graph.num_nodes
+
+            # Compute node degrees
             node_degrees = torch.bincount(edge_index[0], minlength=num_nodes)
 
-            # Sort indices based on degrees
+            # Sort nodes by degree
             sorted_indices = torch.argsort(node_degrees, descending=True)
 
-            # Convert edge_index to an adjacency matrix
+            # Create adjacency matrix
             adjacency_matrix = torch.zeros((num_nodes, num_nodes))
             adjacency_matrix[edge_index[0], edge_index[1]] = 1
 
-            # Align adjacency matrix based on sorted indices
+            # Align adjacency matrix and features
             aligned_matrix = adjacency_matrix[sorted_indices][:, sorted_indices]
-            return aligned_matrix.numpy()  # Convert to NumPy for further processing
+            aligned_features = original_features[sorted_indices]
+
+            return aligned_matrix.numpy(), aligned_features
         else:
             raise NotImplementedError(f"Criterion {criterion} not implemented")
 
 
-    def estimate_graphon(self, graphs, K, method="partition"):
+
+    def estimate_graphon(self, graphs, features_list, K, method = "partition"):
         """
         Takes a set of graphs, returns an approximation of the graphon for that set of graphs.
 
@@ -125,32 +137,33 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
         
         # align adjacency matrices
         aligned_adjacency_matrices = []
-        for graph in graphs:
-            aligned_matrix = self.align_nodes(graph)
+        aligned_features_list = []
+
+        for graph, features in zip(graphs, features_list):
+            aligned_matrix, aligned_features = self.align_nodes(graph, features)
             aligned_adjacency_matrices.append(aligned_matrix)
+            aligned_features_list.append(aligned_features)
 
         if method == "partition":
-            # initialize step function matrix
-            step_function_matrix = np.zeros((K, K))
-
-            # partition nodes into K intervals; each interval will have N/K nodes
-            N = aligned_adjacency_matrices[0].shape[0] # assumes all graphs have the same number of nodes
+            # Compute step function graphon matrix
+            N = aligned_adjacency_matrices[0].shape[0]
             partition_size = N // K
-
             partitions = [list(range(i, min(i + partition_size, N))) for i in range(0, N, partition_size)]
 
-            # for each partition pair, estimate edge probability, which is the average edge density between the two partitions
+            graphon_matrix = np.zeros((K, K))
             for i in range(K):
                 for j in range(K):
-                    total_edge_density = 0
-                    for adj_matrix in aligned_adjacency_matrices:
-                        partition_i = partitions[i]
-                        partition_j = partitions[j]
-                        step_function_matrix[i, j] += np.mean(adj_matrix[partition_i, :][:, partition_j])
-                    step_function_matrix[i, j] = total_edge_density / len(aligned_adjacency_matrices)
+                    edge_density = [
+                        np.mean(matrix[partitions[i], :][:, partitions[j]])
+                        for matrix in aligned_adjacency_matrices
+                    ]
+                    graphon_matrix[i, j] = np.mean(edge_density)
 
-            return step_function_matrix
+            # Pool node features to compute graphon node features
+            aligned_features_stacked = np.stack(aligned_features_list)
+            graphon_features = np.mean(aligned_features_stacked, axis=0)  # Average pooling
 
+            return graphon_matrix, graphon_features
         elif method == "usvt":
 
             aligned_tensors = self.graph_numpy2tensor(aligned_adjacency_matrices)
@@ -202,51 +215,72 @@ class GMixup(torch_geometric.datasets.graph_generator.GraphGenerator):
 
     def generate(self, aug_ratio, num_samples, interpolation_lambda):
         """
-        Generates synthetic graphs for data augmentation.
+        Generates synthetic graphs with node features for data augmentation.
         
         Parameters:
         aug_ratio -- Proportion of augmented data relative to the original dataset.
-        num_samples -- Number of synthetic samples to generate per pair of classes.
+        num_samples -- Number of synthetic graphs to generate per pair of classes.
         interpolation_lambda -- Interpolation factor between graphons and labels.
         
         Returns:
-        synthetic_graphs -- List of synthetic `Data` objects with labels in `y`.
+        synthetic_graphs -- List of synthetic `Data` objects with features.
         """
         synthetic_graphs = []
         num_graphs = len(self.train_data)
         num_augmented = int(num_graphs * aug_ratio)
 
-        for _ in range(num_augmented):
+        while len(synthetic_graphs) < num_augmented:
             # Randomly sample two graphs
             idx1, idx2 = np.random.choice(len(self.train_data), size=2, replace=False)
             graph1, graph2 = self.train_data[idx1], self.train_data[idx2]
 
-            # Estimate graphons
-            graphon1 = self.estimate_graphon([graph1], K=10)
-            graphon2 = self.estimate_graphon([graph2], K=10)
+            # Estimate graphons and node features
+            graphon1, features1 = self.estimate_graphon([graph1], [graph1.x], K=10)
+            graphon2, features2 = self.estimate_graphon([graph2], [graph2.x], K=10)
 
-            # Mix graphons and labels
-            mixed_graphon = self.graphon_mixup(graphon1, graphon2, interpolation_lambda)
-            mixed_label = self.label_mixup(graph1.y.item(), graph2.y.item(), interpolation_lambda)
+            for _ in range(num_samples):
+                # Mix graphons and labels
+                mixed_graphon = self.graphon_mixup(graphon1, graphon2, interpolation_lambda)
+                mixed_features = interpolation_lambda * features1 + (1 - interpolation_lambda) * features2
+                mixed_label = self.label_mixup(graph1.y.item(), graph2.y.item(), interpolation_lambda)
 
-            # Generate synthetic graph
-            synthetic_graph = self.generate_from_graphon(mixed_graphon)
-            synthetic_graph.y = torch.tensor([mixed_label], dtype=torch.float)  # Ensure label is set
+                # Generate synthetic graph
+                synthetic_graph = self.generate_from_graphon(mixed_graphon, mixed_features)
+                synthetic_graph.y = torch.tensor([mixed_label], dtype=torch.float)
 
-            synthetic_graphs.append(synthetic_graph)
+                synthetic_graphs.append(synthetic_graph)
+
+                # Break if we reach the desired number of augmented graphs
+                if len(synthetic_graphs) >= num_augmented:
+                    break
 
         return synthetic_graphs
+
     
-    def generate_from_graphon(self, graphon):
+    def generate_from_graphon(self, graphon, graphon_features):
         """
-        Generates a synthetic graph from a graphon matrix.
+        Generates a synthetic graph from a graphon matrix and assigns node features.
         
         Parameters:
-        graphon -- Matrix representing the graphon approximation.
+        graphon -- Step function matrix representing the graphon.
+        graphon_features -- Node features derived from graphon alignment and pooling.
+        
+        Returns:
+        Data -- A PyTorch Geometric graph with node features and edges.
         """
         num_nodes = graphon.shape[0]
+
+        # Generate adjacency matrix based on the graphon
         adjacency_matrix = (np.random.rand(num_nodes, num_nodes) < graphon).astype(float)
         adjacency_matrix = np.triu(adjacency_matrix) + np.triu(adjacency_matrix, k=1).T
 
+        # Create edge index
         edge_index = torch.tensor(np.array(adjacency_matrix.nonzero()), dtype=torch.long)
-        return Data(edge_index=edge_index)
+
+        # Create graph with node features
+        synthetic_graph = Data(edge_index=edge_index)
+        synthetic_graph.num_nodes = num_nodes  # Explicitly set num_nodes
+        synthetic_graph.x = torch.tensor(graphon_features, dtype=torch.float)  # Assign graphon features to nodes
+
+        return synthetic_graph
+
