@@ -27,7 +27,7 @@ if __name__ == '__main__':
     # GMixup
     parser.add_argument('--vanilla', dest='use_mixup', action='store_false')
     parser.add_argument('--aug-ratio', type=float, default=0.5)
-    parser.add_argument('--interpolation-lambda', type=float, default=0.1)
+    parser.add_argument('--interpolation-range', nargs=2, type=float, default=(0.1,0.2))
     args = parser.parse_args()
 
 

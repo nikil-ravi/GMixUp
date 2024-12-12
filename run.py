@@ -1,6 +1,7 @@
 
 import argparse
 from pathlib import Path
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,13 +9,14 @@ from torch_geometric.data import Dataset
 from torch_geometric.loader import DataLoader
 from torch.optim.lr_scheduler import StepLR
 
-from gmixup import GMixup, mixup_cross_entropy_loss
+from gmixup import GMixup
 from data import *
 from model import GIN, GCN
 
 
 def main(args):
     torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     # get data
     dataset = load_data(args.dataset, args.data_cache_path)
@@ -29,11 +31,15 @@ def main(args):
 
         gmixup = GMixup(train)
         synthetic = gmixup.generate(
-            aug_ratio=0.5,
-            num_samples=5,
-            interpolation_lambda=args.interpolation_lambda,
+            num_samples=int(len(train)*args.aug_ratio),
+            interpolation_range=args.interpolation_range,
         )
+        print(f'Generated {len(synthetic)} synthetic graphs')
         combined_graphs = train + synthetic
+        #combined_graphs = synthetic
+        #combined_graphs = train
+        #for g in synthetic:
+        #    print(g.y, g.annotation)
 
         for i, g in enumerate(combined_graphs):
             # assert shape of y is (1, num_classes)
@@ -44,9 +50,10 @@ def main(args):
             batch_size=args.batch_size,
             shuffle=True
         )
-        def loss_fn(preds, target):
-            preds = F.log_softmax(preds, dim=1)
-            return mixup_cross_entropy_loss(preds, target)
+        #def loss_fn(preds, target):
+        #    preds = F.log_softmax(preds, dim=1)
+        #    return mixup_cross_entropy_loss(preds, target)
+        loss_fn = F.cross_entropy
 
     else:
         dataloader = DataLoader(
@@ -98,7 +105,7 @@ def main(args):
         print(f'Epoch {epoch+1}/{args.epochs}, Loss: {avg_loss:.4f}')
 
 
-    return evaluate(model, DataLoader(test, batch_size=args.batch_size), device)
+    return evaluate(model, DataLoader(test, batch_size=args.batch_size, shuffle=True), device)
 
 
 
@@ -111,6 +118,7 @@ def evaluate(model: nn.Module, test: DataLoader, device):
         out = model.predict(batch.x, batch.edge_index, batch.batch)
 
         labels = torch.argmax(batch.y, dim=1)  # Convert one-hot to class indices
+        #print(out, labels)
         total_correct += (out == labels).sum()
         total_samples += len(batch)
     
@@ -134,12 +142,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42)
     # Training
     parser.add_argument('--batch-size', type=int, default=128)
-    parser.add_argument('--epochs', type=int, default=800)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--lr', type=float, default=0.01)
     # GMixup
     parser.add_argument('--vanilla', dest='use_mixup', action='store_false')
     parser.add_argument('--aug-ratio', type=float, default=0.5)
-    parser.add_argument('--interpolation-lambda', type=float, default=0.1)
+    parser.add_argument('--interpolation-range', nargs=2, type=float, default=(0.1,0.2))
     args = parser.parse_args()
 
     main(args)

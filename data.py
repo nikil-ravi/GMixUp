@@ -58,8 +58,12 @@ def split_data(
     N = len(dataset)
     ntrain = int(train_amount * N)
 
-    train = dataset.index_select(slice(0, ntrain))
-    test = dataset.index_select(slice(ntrain, N))
+    shuffled_indices = torch.randperm(len(dataset))
+
+    train = [dataset[i] for i in shuffled_indices[:ntrain]]
+    test = [dataset[i] for i in shuffled_indices[ntrain:]]
+    #train = DatasetFromList(train)
+    #test = DatasetFromList(test)
 
     print(f'Train: {len(train)} graphs | Test: {len(test)} graphs')
     return train, test

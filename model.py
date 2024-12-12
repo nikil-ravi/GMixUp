@@ -8,7 +8,7 @@ from torch_geometric.nn import global_mean_pool
 
 # GIN
 class GIN(torch.nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=64):
+    def __init__(self, input_dim, output_dim, hidden_dim=8):
         super(GIN, self).__init__()
 
         # using the built-in GIN model from PyTorch Geometric, with parameters 
@@ -29,6 +29,7 @@ class GIN(torch.nn.Module):
         x = self.gin(x, edge_index)
         x = global_mean_pool(x, batch)
         x = F.relu(self.fc1(x))
+        #x = F.dropout(x, p=0.5, training=self.training)
         return self.fc2(x)
     
     def predict(self, x, edge_index, batch):
@@ -38,7 +39,7 @@ class GIN(torch.nn.Module):
 
 # GCN
 class GCN(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=64):
+    def __init__(self, input_dim, output_dim, hidden_dim=8):
         super(GCN, self).__init__()
 
         # using the built-in GCN model from PyTorch Geometric, with parameters 
