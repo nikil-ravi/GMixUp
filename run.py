@@ -56,7 +56,9 @@ def main(args):
             batch_size=args.batch_size,
             shuffle=True
         )
-        loss_fn = mixup_cross_entropy_loss
+        def loss_fn(preds, target):
+            preds = F.log_softmax(preds, dim=1)
+            return mixup_cross_entropy_loss(preds, target)
 
     else:
         dataloader = DataLoader(
@@ -91,7 +93,6 @@ def main(args):
         for batch in dataloader:
             batch = batch.to(device)
             out = model.forward(batch.x, batch.edge_index, batch.batch)
-            out = F.log_softmax(out, dim=1)
             
             # Compute loss (assumes labels are in batch.y)
             loss = loss_fn(out, batch.y)
