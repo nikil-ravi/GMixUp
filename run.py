@@ -19,24 +19,13 @@ def main(args):
     # get data
     dataset = load_data(args.dataset, args.data_cache_path)
     dataset = create_node_features(dataset)
+    dataset = make_labels_one_hot(dataset)
     train, test = split_data(dataset, *args.data_split)
     num_features = dataset.num_features
     num_classes = dataset.num_classes
 
 
     if args.use_mixup:
-        # Modify training data labels to one-hot
-        # Convert 'train' dataset to a list of Data objects.
-        train_list = [data for data in train]
-        for data in train_list:
-            data.y = F.one_hot(data.y.long(), num_classes=num_classes).float()
-        train = train_list  # Now 'train' is a list of Data objects with updated labels.
-
-        # Similarly for test:
-        test_list = [data for data in test]
-        for data in test_list:
-            data.y = F.one_hot(data.y.long(), num_classes=num_classes).float()
-        test = test_list
 
         gmixup = GMixup(train)
         synthetic = gmixup.generate(
@@ -44,7 +33,6 @@ def main(args):
             num_samples=5,
             interpolation_lambda=args.interpolation_lambda,
         )
-
         combined_graphs = train + synthetic
 
         for i, g in enumerate(combined_graphs):

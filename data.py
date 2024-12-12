@@ -94,25 +94,10 @@ def create_node_features(dataset: Dataset):
     return dataset
 
             
-    
-    max_degree = 0
-    degs = []
-    for data in dataset:
-        degs += [degree(data.edge_index[0], dtype=torch.long)]
-        max_degree = max( max_degree, degs[-1].max().item() )
-        data.num_nodes = int( torch.max(data.edge_index) ) + 1
-
-    if max_degree < 2000:
-        # dataset.transform = T.OneHotDegree(max_degree)
-
-        for data in dataset:
-            degs = degree(data.edge_index[0], dtype=torch.long)
-            data.x = F.one_hot(degs, num_classes=max_degree+1).to(torch.float)
-    else:
-        deg = torch.cat(degs, dim=0).to(torch.float)
-        mean, std = deg.mean().item(), deg.std().item()
-        for data in dataset:
-            degs = degree(data.edge_index[0], dtype=torch.long)
-            data.x = ( (degs - mean) / std ).view( -1, 1 )
+def make_labels_one_hot(dataset: Dataset):
+    num_classes = dataset.num_classes
+    dataset = list(dataset)
+    for graph in dataset:
+        graph.y = F.one_hot(graph.y.long(), num_classes=num_classes).float()
+    dataset = DatasetFromList(dataset)
     return dataset
-
